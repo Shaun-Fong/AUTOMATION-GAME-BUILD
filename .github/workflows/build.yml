@@ -175,15 +175,33 @@ jobs:
 
           # 运行Godot前import
           .\godot.exe --headless --quiet --import --path .\src\RedMemoryProject
-          #--log-file log.txt
   
       # 9. Import project
       - name: Run unit tests
         shell: pwsh
         run: |
           # 运行Godot测试
-          .\godot.exe --headless --quiet -d --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs
-          #--log-file log.txt
+          .\godot.exe --headless --quiet -d --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
+
+      - name: Send report email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_URL }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: CI Report
+          to: ${{ secrets.SMTP_TO }}
+          from: CI Bot <${{ secrets.SMTP_USER }}>
+          body: |
+            Automated test finished.
+            Branch    : ${{ github.ref_name }}
+            Commit    : ${{ github.sha }}
+            Workflow  : ${{ github.workflow }}
+            Run ID    : ${{ github.run_id }}
+            CI Run    : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Please see attached log.txt for details.
+          attachments: log.txt
 
       # 10. 保存新的 revision
       - name: Save new revision
