@@ -177,10 +177,10 @@ jobs:
         run: |
           cd D:\
           # 运行前关闭测试模式
-          .\src\tools\godot_setup.ps1 .\src\RedMemoryProject\project.godot
+          .\src\tools\godot_setup.ps1 D:\src\RedMemoryProject\project.godot
 
           # 运行Godot前import
-          .\godot.exe --headless --quiet --import --path .\src\RedMemoryProject
+          .\godot.exe --headless --quiet --import --path D:\src\RedMemoryProject
   
       # 9. Import project
       - name: Run unit tests
@@ -188,7 +188,7 @@ jobs:
         run: |
           cd D:\
           # 运行Godot测试
-          .\godot.exe --headless --quiet --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
+          .\godot.exe --headless --quiet --path D:\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
 
       - name: Send report email
         uses: dawidd6/action-send-mail@v3
