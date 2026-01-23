@@ -152,11 +152,13 @@ jobs:
                 --trust-server-cert `
                 --quiet
           }
+          mv src D:\src
 
       # 7. Godot 下载
       - name: Godot download
         shell: pwsh
         run: |
+          cd D:\
           Invoke-WebRequest ${{ secrets.GODOT_DOWNLOAD_URL }} -OutFile godot.zip
           Expand-Archive godot.zip -DestinationPath .
           $exe = Get-ChildItem -Filter "Godot*64.exe" | Select-Object -First 1
@@ -173,6 +175,7 @@ jobs:
       - name: Import project
         shell: pwsh
         run: |
+          cd D:\
           # 运行前关闭测试模式
           .\src\tools\godot_setup.ps1 .\src\RedMemoryProject\project.godot
 
@@ -183,6 +186,7 @@ jobs:
       - name: Run unit tests
         shell: pwsh
         run: |
+          cd D:\
           # 运行Godot测试
           .\godot.exe --headless --quiet --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
 
@@ -226,4 +230,5 @@ jobs:
       - name: Clean up
         shell: pwsh
         run: |
+          mv D:\src .\src
           Remove-Item -Path ".\src\RedMemoryProject\.godot" -Recurse -Force -ErrorAction SilentlyContinue
