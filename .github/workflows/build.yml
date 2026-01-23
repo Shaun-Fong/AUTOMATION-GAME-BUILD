@@ -166,8 +166,8 @@ jobs:
           }
           Rename-Item $exe.FullName godot.exe
 
-      # 8. Run unit tests
-      - name: Run unit tests
+      # 8. Import project
+      - name: Import project
         shell: pwsh
         run: |
           # 运行前关闭测试模式
@@ -176,12 +176,16 @@ jobs:
           # 运行Godot前import
           .\godot.exe --headless --quiet --import --path .\src\RedMemoryProject
           #--log-file log.txt
-
+  
+      # 9. Import project
+      - name: Run unit tests
+        shell: pwsh
+        run: |
           # 运行Godot测试
-          .\godot.exe --headless --quiet -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --path .\src\RedMemoryProject
+          .\godot.exe --headless --quiet -d --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs
           #--log-file log.txt
 
-      # 9. 保存新的 revision
+      # 10. 保存新的 revision
       - name: Save new revision
         if: steps.diff.outputs.updated == 'true'
         shell: pwsh
