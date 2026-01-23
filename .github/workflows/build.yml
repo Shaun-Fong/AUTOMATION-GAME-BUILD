@@ -4,15 +4,11 @@ permissions:
   contents: write
 
 on:
-  # 定时执行：每 10 分钟检查一次 SVN
-  #schedule:
-  #  - cron: "*/10 * * * *"
-
   # 手动执行
   workflow_dispatch:
     inputs:
       force:
-        description: "强制执行（忽略 SVN revision 对比）"
+        description: "强制执行"
         required: false
         default: "false"
 
@@ -22,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-svn:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: windows-latest
 
     steps:
       # 0. Tailscale
@@ -38,106 +34,105 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 svn
+      # 2. 安装 SVN
       - name: Install Subversion
+        shell: pwsh
         run: |
-          sudo apt-get update
-          sudo apt-get install -y subversion
+          choco install svn -y
 
       # 3. 获取 SVN 最新 revision
       - name: Get SVN latest revision
         id: svn
+        shell: pwsh
         env:
           SVN_URL: ${{ secrets.SVN_URL }}
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          set -euo pipefail
+          $info = svn info $env:SVN_URL `
+            --username $env:SVN_USERNAME `
+            --password $env:SVN_PASSWORD `
+            --non-interactive `
+            --trust-server-cert
 
-          REV=$(svn info "$SVN_URL" \
-            --username "$SVN_USERNAME" \
-            --password "$SVN_PASSWORD" \
-            --non-interactive \
-            --trust-server-cert \
-            | grep '^Revision' \
-            | awk '{print $2}')
+          $revLine = $info | Where-Object { $_ -match '^Revision' }
+          if (-not $revLine) { throw "Failed to get SVN revision" }
 
-          if [ -z "$REV" ]; then
-            echo "Failed to get SVN revision"
-            exit 1
-          fi
-
-          echo "rev=$REV" >> "$GITHUB_OUTPUT"
-          echo "SVN revision: $REV"
+          $rev = ($revLine -split '\s+')[1]
+          Write-Output "rev=$rev" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "SVN revision: $rev"
 
       # 4. 读取上一次 revision
       - name: Load last revision
         id: last
+        shell: pwsh
         run: |
-          set -euo pipefail
+          if (Test-Path ".ci\last_revision.txt") {
+            $last = Get-Content ".ci\last_revision.txt"
+          } else {
+            $last = 0
+          }
 
-          if [ -f .ci/last_revision.txt ]; then
-            LAST=$(cat .ci/last_revision.txt)
-          else
-            LAST=0
-          fi
-
-          echo "last=$LAST" >> "$GITHUB_OUTPUT"
-          echo "Last recorded revision: $LAST"
+          Write-Output "last=$last" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "Last recorded revision: $last"
 
       # 5. 对比 revision / force
       - name: Compare revision
         id: diff
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $force = '${{ github.event.inputs.force }}'
+          if (-not $force) { $force = "false" }
 
-          # schedule 触发时 github.event.inputs.force 为空
-          FORCE="${{ github.event.inputs.force || 'false' }}"
+          $rev = '${{ steps.svn.outputs.rev }}'
+          $last = '${{ steps.last.outputs.last }}'
 
-          if [ "$FORCE" = "true" ]; then
-            echo "Force run enabled"
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          if ($force -eq "true") {
+              Write-Host "Force run enabled"
+              Write-Output "updated=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              exit 0
+          }
 
-          if [ "${{ steps.svn.outputs.rev }}" -gt "${{ steps.last.outputs.last }}" ]; then
-            echo "SVN updated"
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "SVN not changed"
-            echo "updated=false" >> "$GITHUB_OUTPUT"
-          fi
+          if ([int]$rev -gt [int]$last) {
+              Write-Host "SVN updated"
+              Write-Output "updated=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+              Write-Host "SVN not changed"
+              Write-Output "updated=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
 
-      # 6. 执行构建
-      - name: Run task
+      # 6. 拉取项目
+      - name: Checkout SVN
         if: steps.diff.outputs.updated == 'true'
+        shell: pwsh
+        env:
+          SVN_URL: ${{ secrets.SVN_URL }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          echo "===================================="
-          echo "Running task because:"
-          echo "- SVN updated OR force run enabled"
-          echo "SVN revision: ${{ steps.svn.outputs.rev }}"
-          echo "===================================="
-
-          # ./build.sh
+          svn checkout $env:SVN_URL svn-src `
+            --username $env:SVN_USERNAME `
+            --password $env:SVN_PASSWORD `
+            --non-interactive `
+            --trust-server-cert
 
       # 7. 保存新的 revision
       - name: Save new revision
         if: steps.diff.outputs.updated == 'true'
+        shell: pwsh
         run: |
-          set -euo pipefail
+          if (-not (Test-Path ".ci")) { New-Item -ItemType Directory ".ci" }
 
-          mkdir -p .ci
-          echo "${{ steps.svn.outputs.rev }}" > .ci/last_revision.txt
+          '${{ steps.svn.outputs.rev }}' | Out-File ".ci\last_revision.txt" -Encoding utf8
 
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          git add .ci/last_revision.txt
+          git add .ci\last_revision.txt
 
-          if git diff --cached --quiet; then
-            echo "No revision change, skip commit"
-            exit 0
-          fi
-
-          git commit -m "ci: update svn revision to ${{ steps.svn.outputs.rev }}"
-          git push
+          if (-not (git diff --cached --quiet)) {
+              git commit -m "ci: update svn revision to ${{ steps.svn.outputs.rev }}"
+              git push
+          } else {
+              Write-Host "No revision change, skip commit"
+          }
