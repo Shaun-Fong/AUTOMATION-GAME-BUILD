@@ -38,13 +38,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 SVN（Windows）
+      # 2. 安装 SVN 并设置 PATH
       - name: Install Subversion
+        shell: pwsh
         run: |
-          choco install subversion -y
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          choco install svn -y
+
+          # Chocolatey 默认 SVN 安装路径
+          $svnPath = "C:\Program Files (x86)\Subversion\bin"
+
+          # 临时加入当前 step PATH
+          $env:PATH += ";$svnPath"
+
+          # 设置 workflow 全局 PATH
+          Write-Output "PATH=$env:PATH" >> $env:GITHUB_ENV
+
+          # 验证安装
           svn --version
 
-      # 3. 获取 SVN 最新 revision（PowerShell）
+      # 3. 获取 SVN 最新 revision
       - name: Get SVN latest revision
         id: svn
         shell: pwsh
@@ -59,14 +72,11 @@ jobs:
             --non-interactive `
             --trust-server-cert
 
-          $rev = ($info | Select-String "^Revision").ToString().Split()[-1]
+          $revLine = $info | Where-Object { $_ -match '^Revision' }
+          if (-not $revLine) { throw "Failed to get SVN revision" }
 
-          if (-not $rev) {
-            Write-Error "Failed to get SVN revision"
-            exit 1
-          }
-
-          "rev=$rev" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $rev = ($revLine -split '\s+')[1]
+          Write-Output "rev=$rev" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Host "SVN revision: $rev"
 
       # 4. 读取上一次 revision
@@ -74,31 +84,41 @@ jobs:
         id: last
         shell: pwsh
         run: |
-          if (Test-Path .ci/last_revision.txt) {
-            $last = Get-Content .ci/last_revision.txt
+          if (Test-Path ".ci\last_revision.txt") {
+            $last = Get-Content ".ci\last_revision.txt"
           } else {
             $last = 0
           }
 
-          "last=$last" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "last=$last" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Host "Last recorded revision: $last"
 
-      # 5. 对比 revision
+      # 5. 对比 revision / force
       - name: Compare revision
         id: diff
         shell: pwsh
         run: |
-          $force = "${{ github.event.inputs.force }}" -eq "true"
-          $rev   = [int]"${{ steps.svn.outputs.rev }}"
-          $last  = [int]"${{ steps.last.outputs.last }}"
+          $force = '${{ github.event.inputs.force }}'
+          if (-not $force) { $force = "false" }
 
-          if ($force -or $rev -gt $last) {
-            "updated=true" | Out-File $env:GITHUB_OUTPUT -Append
-          } else {
-            "updated=false" | Out-File $env:GITHUB_OUTPUT -Append
+          $rev = '${{ steps.svn.outputs.rev }}'
+          $last = '${{ steps.last.outputs.last }}'
+
+          if ($force -eq "true") {
+              Write-Host "Force run enabled"
+              Write-Output "updated=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              exit 0
           }
 
-      # 6. 拉取 SVN
+          if ([int]$rev -gt [int]$last) {
+              Write-Host "SVN updated"
+              Write-Output "updated=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+              Write-Host "SVN not changed"
+              Write-Output "updated=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+
+      # 6. 拉取项目
       - name: Checkout SVN
         if: steps.diff.outputs.updated == 'true'
         shell: pwsh
@@ -107,7 +127,7 @@ jobs:
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          svn checkout $env:SVN_URL src `
+          svn checkout $env:SVN_URL svn-src `
             --username $env:SVN_USERNAME `
             --password $env:SVN_PASSWORD `
             --non-interactive `
@@ -120,22 +140,25 @@ jobs:
         run: |
           Invoke-WebRequest ${{ secrets.GODOT_DOWNLOAD_URL }} -OutFile godot.zip
           Expand-Archive godot.zip -DestinationPath .
-
-          $dir = Get-ChildItem -Directory | Where-Object { $_.Name -like "Godot*" } | Select-Object -First 1
-          Rename-Item $dir.FullName godot
+          $exe = Get-ChildItem -Filter "Godot*64.exe" | Select-Object -First 1
+          if (-not $exe) {
+              Write-Error "Godot executable not found"
+              exit 1
+          }
+          Rename-Item $exe.FullName godot.exe
 
       # 8. Run unit tests
       - name: Run unit tests
         shell: pwsh
         run: |
-          ./godot/godot.exe --headless --quiet --no-header `
-            --import --path ./src/RedMemoryProject `
-            --log-file log.txt
+          .\godot.exe --headless --quiet --no-header `
+            --import --path ./src/RedMemoryProject
+          #--log-file log.txt
 
-          ./godot/godot.exe --headless --quiet --no-header `
+          .\godot.exe --headless --quiet --no-header `
             -s res://addons/gut/gut_cmdln.gd `
-            -gdir=res://test -gexit -ginclude_subdirs `
-            --log-file log.txt
+            -gdir=res://test -gexit -ginclude_subdirs
+          #--log-file log.txt
 
       # 9. 保存新的 revision
       - name: Save new revision
