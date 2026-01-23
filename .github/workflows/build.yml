@@ -38,9 +38,8 @@ jobs:
       - name: Install SVN
         shell: pwsh
         run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force
           choco install svn -y
-          $env:PATH += ";C:\ProgramData\chocolatey\bin"
+          refreshenv
           svn --version
 
       # 3. 获取 SVN 最新 revision
