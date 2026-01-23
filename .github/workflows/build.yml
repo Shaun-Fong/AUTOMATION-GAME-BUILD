@@ -127,7 +127,7 @@ jobs:
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          svn checkout $env:SVN_URL svn-src `
+          svn checkout $env:SVN_URL src `
             --username $env:SVN_USERNAME `
             --password $env:SVN_PASSWORD `
             --non-interactive `
