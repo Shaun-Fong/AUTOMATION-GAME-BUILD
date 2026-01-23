@@ -151,13 +151,19 @@ jobs:
       - name: Run unit tests
         shell: pwsh
         run: |
+          # 运行前关闭测试模式
+          .\src\tools\godot_setup.ps1 .\src\RedMemoryProject\project.godot
+
+          # 运行Godot前import
           .\godot.exe --headless --quiet --no-header `
-            --import --path ./src/RedMemoryProject
+            --import --path .\src\RedMemoryProject
           #--log-file log.txt
 
+          # 运行Godot测试
           .\godot.exe --headless --quiet --no-header `
             -s res://addons/gut/gut_cmdln.gd `
-            -gdir=res://test -gexit -ginclude_subdirs
+            -gdir=res://test -gexit -ginclude_subdirs `
+            --path .\src\RedMemoryProject
           #--log-file log.txt
 
       # 9. 保存新的 revision
