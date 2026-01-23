@@ -127,7 +127,8 @@ jobs:
             --username $env:SVN_USERNAME `
             --password $env:SVN_PASSWORD `
             --non-interactive `
-            --trust-server-cert
+            --trust-server-cert `
+            --quiet
 
       # 7. 保存新的 revision
       - name: Save new revision
