@@ -38,7 +38,9 @@ jobs:
       - name: Install Subversion
         shell: pwsh
         run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
           choco install svn -y
+          svn --version
 
       # 3. 获取 SVN 最新 revision
       - name: Get SVN latest revision
