@@ -34,16 +34,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 SVN
-      - name: Install SVN
+      # 2. 安装 SVN 并设置 PATH
+      - name: Install Subversion
         shell: pwsh
         run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
           choco install svn -y
-          refreshenv
 
-      - name: SVN Version Check
-        shell: pwsh
-        run: |
+          # Chocolatey 默认 SVN 安装路径
+          $svnPath = "C:\Program Files (x86)\Subversion\bin"
+
+          # 临时加入当前 step PATH
+          $env:PATH += ";$svnPath"
+
+          # 设置 workflow 全局 PATH
+          Write-Output "PATH=$env:PATH" >> $env:GITHUB_ENV
+
+          # 验证安装
           svn --version
 
       # 3. 获取 SVN 最新 revision
