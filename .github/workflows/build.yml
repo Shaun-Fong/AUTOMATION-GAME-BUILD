@@ -14,7 +14,7 @@ on:
       force:
         description: "强制执行"
         required: false
-        default: "false"
+        default: "true"
 
 # 防止并发跑两次
 concurrency:
@@ -171,16 +171,13 @@ jobs:
           $exe_console = Get-ChildItem -Filter "Godot*_console.exe" | Select-Object -First 1
           Rename-Item $exe_console.FullName godot_console.exe
 
-          ls
-
       # 8. Import project
       - name: Import project
         shell: pwsh
         run: |
           cd D:\src
-          ls
           # 运行前关闭测试模式
-          .\tools\godot_setup.ps1 .\RedMemoryProject\project.godot
+          #.\tools\godot_setup.ps1 .\RedMemoryProject\project.godot
 
           # 运行Godot前import
           .\godot.exe --headless --quiet --import --path .\RedMemoryProject
@@ -190,7 +187,6 @@ jobs:
         shell: pwsh
         run: |
           cd D:\src
-          ls
           # 运行Godot测试
           .\godot.exe --headless --quiet --path .\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file D:\log.txt
 
@@ -234,7 +230,7 @@ jobs:
       - name: Clean up
         shell: pwsh
         run: |
-          echo pwd
+          echo $pwd
           Remove-Item -Path "D:\src\godot.exe" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -Path "D:\src\godot_console.exe" -Recurse -Force -ErrorAction SilentlyContinue
           mv D:\src .\src
