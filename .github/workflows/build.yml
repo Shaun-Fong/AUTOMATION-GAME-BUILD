@@ -143,8 +143,8 @@ jobs:
 
       - name: Run unit tests
         run: |
-          ./godot --headless --import --path ./src/RedMemoryProject/
-          ./godot --headless --verbose -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs
+          ./godot --headless --quiet --no-header --import --path ./src/RedMemoryProject/ --log-file log.txt
+          ./godot --headless --quiet --no-header -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
 
       # 8. 保存新的 revision
       - name: Save new revision
