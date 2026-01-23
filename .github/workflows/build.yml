@@ -40,6 +40,10 @@ jobs:
         run: |
           choco install svn -y
           refreshenv
+
+      - name: SVN Version Check
+        shell: pwsh
+        run: |
           svn --version
 
       # 3. 获取 SVN 最新 revision
