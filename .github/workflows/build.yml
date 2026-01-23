@@ -222,3 +222,8 @@ jobs:
             git commit -m "ci: update svn revision to ${{ steps.svn.outputs.rev }}"
             git push
           }
+
+      - name: Clean up
+        shell: pwsh
+        run: |
+          Remove-Item -Path ".\src\RedMemoryProject\.godot" -Recurse -Force -ErrorAction SilentlyContinue
