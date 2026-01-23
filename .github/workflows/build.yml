@@ -1,5 +1,8 @@
 name: build
 
+permissions:
+  contents: write
+
 on:
   # 定时执行：每 10 分钟检查一次 SVN
   #schedule:
