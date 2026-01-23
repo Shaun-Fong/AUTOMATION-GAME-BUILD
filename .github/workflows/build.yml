@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       # 0. Tailscale
@@ -34,135 +34,122 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      # 1. Checkout 仓库（用于保存 last_revision）
+      # 1. Checkout 仓库
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. 安装 SVN
+      # 2. 安装 SVN（Windows）
       - name: Install Subversion
         run: |
-          sudo apt-get update
-          sudo apt-get install -y subversion
+          choco install subversion -y
           svn --version
 
-      # 3. 获取 SVN 最新 revision
+      # 3. 获取 SVN 最新 revision（PowerShell）
       - name: Get SVN latest revision
         id: svn
+        shell: pwsh
         env:
           SVN_URL: ${{ secrets.SVN_URL }}
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          set -euo pipefail
+          $info = svn info $env:SVN_URL `
+            --username $env:SVN_USERNAME `
+            --password $env:SVN_PASSWORD `
+            --non-interactive `
+            --trust-server-cert
 
-          info=$(svn info "$SVN_URL" \
-            --username "$SVN_USERNAME" \
-            --password "$SVN_PASSWORD" \
-            --non-interactive \
-            --trust-server-cert)
+          $rev = ($info | Select-String "^Revision").ToString().Split()[-1]
 
-          rev=$(echo "$info" | grep '^Revision' | awk '{print $2}')
-          if [ -z "$rev" ]; then
-            echo "Failed to get SVN revision"
+          if (-not $rev) {
+            Write-Error "Failed to get SVN revision"
             exit 1
-          fi
+          }
 
-          echo "rev=$rev" >> $GITHUB_OUTPUT
-          echo "SVN revision: $rev"
+          "rev=$rev" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "SVN revision: $rev"
 
       # 4. 读取上一次 revision
       - name: Load last revision
         id: last
+        shell: pwsh
         run: |
-          set -euo pipefail
+          if (Test-Path .ci/last_revision.txt) {
+            $last = Get-Content .ci/last_revision.txt
+          } else {
+            $last = 0
+          }
 
-          if [ -f .ci/last_revision.txt ]; then
-            last=$(cat .ci/last_revision.txt)
-          else
-            last=0
-          fi
+          "last=$last" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Last recorded revision: $last"
 
-          echo "last=$last" >> $GITHUB_OUTPUT
-          echo "Last recorded revision: $last"
-
-      # 5. 对比 revision / force
+      # 5. 对比 revision
       - name: Compare revision
         id: diff
+        shell: pwsh
         run: |
-          set -euo pipefail
+          $force = "${{ github.event.inputs.force }}" -eq "true"
+          $rev   = [int]"${{ steps.svn.outputs.rev }}"
+          $last  = [int]"${{ steps.last.outputs.last }}"
 
-          force="${{ github.event.inputs.force || 'false' }}"
-          rev="${{ steps.svn.outputs.rev }}"
-          last="${{ steps.last.outputs.last }}"
+          if ($force -or $rev -gt $last) {
+            "updated=true" | Out-File $env:GITHUB_OUTPUT -Append
+          } else {
+            "updated=false" | Out-File $env:GITHUB_OUTPUT -Append
+          }
 
-          if [ "$force" = "true" ]; then
-            echo "Force run enabled"
-            echo "updated=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          if [ "$rev" -gt "$last" ]; then
-            echo "SVN updated"
-            echo "updated=true" >> $GITHUB_OUTPUT
-          else
-            echo "SVN not changed"
-            echo "updated=false" >> $GITHUB_OUTPUT
-          fi
-
-      # 6. 拉取项目
+      # 6. 拉取 SVN
       - name: Checkout SVN
         if: steps.diff.outputs.updated == 'true'
+        shell: pwsh
         env:
           SVN_URL: ${{ secrets.SVN_URL }}
           SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
           SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
         run: |
-          set -euo pipefail
-          svn checkout "$SVN_URL" src \
-            --username "$SVN_USERNAME" \
-            --password "$SVN_PASSWORD" \
-            --non-interactive \
-            --trust-server-cert \
+          svn checkout $env:SVN_URL src `
+            --username $env:SVN_USERNAME `
+            --password $env:SVN_PASSWORD `
+            --non-interactive `
+            --trust-server-cert `
             --quiet
-            
-      # 7. GODOT
-      - name: Godot setup
-        run: |
-          chmod +x ./src/tools/godot_setup.sh
-          ./src/tools/godot_setup.sh
 
+      # 7. Godot 下载（Windows Headless）
       - name: Godot download
+        shell: pwsh
         run: |
-          wget ${{ secrets.GODOT_DOWNLOAD_URL }} -O godot.zip
-          #wget ${{ secrets.GODOT_TEMPLATES_URL }} -O godot_templates.zip
-          #unzip godot_templates.zip
-          unzip godot.zip
-          dir=$(ls -d Godot_* | head -n 1)
-          mv "$dir" godot
-          chmod +x godot
+          Invoke-WebRequest ${{ secrets.GODOT_DOWNLOAD_URL }} -OutFile godot.zip
+          Expand-Archive godot.zip -DestinationPath .
 
+          $dir = Get-ChildItem -Directory | Where-Object { $_.Name -like "Godot*" } | Select-Object -First 1
+          Rename-Item $dir.FullName godot
+
+      # 8. Run unit tests
       - name: Run unit tests
+        shell: pwsh
         run: |
-          ./godot --headless --quiet --no-header --import --path ./src/RedMemoryProject/ --log-file log.txt
-          ./godot --headless --quiet --no-header -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
+          ./godot/godot.exe --headless --quiet --no-header `
+            --import --path ./src/RedMemoryProject `
+            --log-file log.txt
 
-      # 8. 保存新的 revision
+          ./godot/godot.exe --headless --quiet --no-header `
+            -s res://addons/gut/gut_cmdln.gd `
+            -gdir=res://test -gexit -ginclude_subdirs `
+            --log-file log.txt
+
+      # 9. 保存新的 revision
       - name: Save new revision
         if: steps.diff.outputs.updated == 'true'
+        shell: pwsh
         run: |
-          set -euo pipefail
-
-          mkdir -p .ci
-          echo "${{ steps.svn.outputs.rev }}" > .ci/last_revision.txt
+          New-Item -ItemType Directory -Force -Path .ci | Out-Null
+          Set-Content .ci/last_revision.txt "${{ steps.svn.outputs.rev }}"
 
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
           git add .ci/last_revision.txt
-
-          if ! git diff --cached --quiet; then
+          if (-not (git diff --cached --quiet)) {
             git commit -m "ci: update svn revision to ${{ steps.svn.outputs.rev }}"
             git push
-          else
-            echo "No revision change, skip commit"
-          fi
+          }
