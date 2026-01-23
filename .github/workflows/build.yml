@@ -165,6 +165,9 @@ jobs:
               exit 1
           }
           Rename-Item $exe.FullName godot.exe
+          
+          $exe_console = Get-ChildItem -Filter "Godot*_console.exe" | Select-Object -First 1
+          Rename-Item $exe_console.FullName godot_console.exe
 
       # 8. Import project
       - name: Import project
@@ -174,14 +177,14 @@ jobs:
           .\src\tools\godot_setup.ps1 .\src\RedMemoryProject\project.godot
 
           # 运行Godot前import
-          .\godot.exe --headless -d --import --path .\src\RedMemoryProject
+          .\godot.exe --headless --quiet --import --path .\src\RedMemoryProject
   
       # 9. Import project
       - name: Run unit tests
         shell: pwsh
         run: |
           # 运行Godot测试
-          .\godot.exe --headless -d --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
+          .\godot.exe --headless --quiet --path .\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
 
       - name: Send report email
         uses: dawidd6/action-send-mail@v3
@@ -190,7 +193,7 @@ jobs:
           server_port: ${{ secrets.SMTP_PORT }}
           username: ${{ secrets.SMTP_USER }}
           password: ${{ secrets.SMTP_PASS }}
-          subject: CI Report
+          subject: ${{ github.repository }} CI Report
           to: ${{ secrets.SMTP_TO }}
           from: CI Bot <${{ secrets.SMTP_USER }}>
           body: |
