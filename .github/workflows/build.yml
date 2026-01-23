@@ -171,14 +171,14 @@ jobs:
           $exe_console = Get-ChildItem -Filter "Godot*_console.exe" | Select-Object -First 1
           Rename-Item $exe_console.FullName godot_console.exe
 
-          ls -l
+          ls
 
       # 8. Import project
       - name: Import project
         shell: pwsh
         run: |
           cd D:\src
-          ls -l
+          ls
           # 运行前关闭测试模式
           .\tools\godot_setup.ps1 .\RedMemoryProject\project.godot
 
@@ -190,6 +190,7 @@ jobs:
         shell: pwsh
         run: |
           cd D:\src
+          ls
           # 运行Godot测试
           .\godot.exe --headless --quiet --path .\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file D:\log.txt
 
