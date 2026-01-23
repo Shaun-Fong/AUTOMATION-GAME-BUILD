@@ -158,7 +158,7 @@ jobs:
       - name: Godot download
         shell: pwsh
         run: |
-          cd D:\
+          cd D:\src
           Invoke-WebRequest ${{ secrets.GODOT_DOWNLOAD_URL }} -OutFile godot.zip
           Expand-Archive godot.zip -DestinationPath .
           $exe = Get-ChildItem -Filter "Godot*64.exe" | Select-Object -First 1
@@ -171,24 +171,27 @@ jobs:
           $exe_console = Get-ChildItem -Filter "Godot*_console.exe" | Select-Object -First 1
           Rename-Item $exe_console.FullName godot_console.exe
 
+          ls -l
+
       # 8. Import project
       - name: Import project
         shell: pwsh
         run: |
-          cd D:\
+          cd D:\src
+          ls -l
           # 运行前关闭测试模式
-          .\src\tools\godot_setup.ps1 D:\src\RedMemoryProject\project.godot
+          .\tools\godot_setup.ps1 .\RedMemoryProject\project.godot
 
           # 运行Godot前import
-          .\godot.exe --headless --quiet --import --path D:\src\RedMemoryProject
+          .\godot.exe --headless --quiet --import --path .\RedMemoryProject
   
       # 9. Import project
       - name: Run unit tests
         shell: pwsh
         run: |
-          cd D:\
+          cd D:\src
           # 运行Godot测试
-          .\godot.exe --headless --quiet --path D:\src\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file $pwd\log.txt
+          .\godot.exe --headless --quiet --path .\RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file D:\log.txt
 
       - name: Send report email
         uses: dawidd6/action-send-mail@v3
@@ -208,7 +211,7 @@ jobs:
             Run ID    : ${{ github.run_id }}
             CI Run    : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Please see attached log.txt for details.
-          attachments: log.txt
+          attachments: D:\log.txt
 
       # 10. 保存新的 revision
       - name: Save new revision
@@ -230,5 +233,8 @@ jobs:
       - name: Clean up
         shell: pwsh
         run: |
+          echo pwd
+          Remove-Item -Path "D:\src\godot.exe" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "D:\src\godot_console.exe" -Recurse -Force -ErrorAction SilentlyContinue
           mv D:\src .\src
           Remove-Item -Path ".\src\RedMemoryProject\.godot" -Recurse -Force -ErrorAction SilentlyContinue
