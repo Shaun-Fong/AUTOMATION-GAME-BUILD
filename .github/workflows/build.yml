@@ -1,0 +1,140 @@
+name: build
+
+on:
+  # 定时执行：每 10 分钟检查一次 SVN
+  #schedule:
+  #  - cron: "*/10 * * * *"
+
+  # 手动执行
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "强制执行（忽略 SVN revision 对比）"
+        required: false
+        default: "false"
+
+# 防止并发跑两次
+concurrency:
+  group: svn-check
+  cancel-in-progress: true
+
+jobs:
+  check-svn:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 0. Tailscale
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      # 1. Checkout 仓库（用于保存 last_revision）
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 安装 svn
+      - name: Install Subversion
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y subversion
+
+      # 3. 获取 SVN 最新 revision
+      - name: Get SVN latest revision
+        id: svn
+        env:
+          SVN_URL: ${{ secrets.SVN_URL }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          REV=$(svn info "$SVN_URL" \
+            --username "$SVN_USERNAME" \
+            --password "$SVN_PASSWORD" \
+            --non-interactive \
+            --trust-server-cert \
+            | grep '^Revision' \
+            | awk '{print $2}')
+
+          if [ -z "$REV" ]; then
+            echo "Failed to get SVN revision"
+            exit 1
+          fi
+
+          echo "rev=$REV" >> "$GITHUB_OUTPUT"
+          echo "SVN revision: $REV"
+
+      # 4. 读取上一次 revision
+      - name: Load last revision
+        id: last
+        run: |
+          set -euo pipefail
+
+          if [ -f .ci/last_revision.txt ]; then
+            LAST=$(cat .ci/last_revision.txt)
+          else
+            LAST=0
+          fi
+
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+          echo "Last recorded revision: $LAST"
+
+      # 5. 对比 revision / force
+      - name: Compare revision
+        id: diff
+        run: |
+          set -euo pipefail
+
+          # schedule 触发时 github.event.inputs.force 为空
+          FORCE="${{ github.event.inputs.force || 'false' }}"
+
+          if [ "$FORCE" = "true" ]; then
+            echo "Force run enabled"
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ steps.svn.outputs.rev }}" -gt "${{ steps.last.outputs.last }}" ]; then
+            echo "SVN updated"
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SVN not changed"
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 6. 执行构建
+      - name: Run task
+        if: steps.diff.outputs.updated == 'true'
+        run: |
+          echo "===================================="
+          echo "Running task because:"
+          echo "- SVN updated OR force run enabled"
+          echo "SVN revision: ${{ steps.svn.outputs.rev }}"
+          echo "===================================="
+
+          # ./build.sh
+
+      # 7. 保存新的 revision
+      - name: Save new revision
+        if: steps.diff.outputs.updated == 'true'
+        run: |
+          set -euo pipefail
+
+          mkdir -p .ci
+          echo "${{ steps.svn.outputs.rev }}" > .ci/last_revision.txt
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add .ci/last_revision.txt
+
+          if git diff --cached --quiet; then
+            echo "No revision change, skip commit"
+            exit 0
+          fi
+
+          git commit -m "ci: update svn revision to ${{ steps.svn.outputs.rev }}"
+          git push
