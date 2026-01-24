@@ -120,13 +120,13 @@ jobs:
       # 8. Import project
       - name: Import project
         run: |
-          ./godot --headless --quiet --import --path ./src/RedMemoryProject
+          ./godot --headless --import --path ./src/RedMemoryProject
 
       # 9. Run unit tests
       - name: Run unit tests
         run: |
           # 运行测试并将日志输出到文件
-          ./godot --headless --quiet --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
+          ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
 
       - name: Send report email
         uses: dawidd6/action-send-mail@v3
