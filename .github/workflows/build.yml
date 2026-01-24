@@ -125,7 +125,7 @@ jobs:
       - name: Run unit tests
         run: |
           # 运行测试并将日志输出到文件
-          ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
+          ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file ~/log.txt
 
       # 11. 发送邮件通知
       - name: Send report email
@@ -144,7 +144,7 @@ jobs:
             Branch   : ${{ github.ref_name }}
             Run ID   : ${{ github.run_id }}
             CI Run   : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          attachments: log.txt
+          attachments: /home/runner/log.txt
 
       # 12. 保存新的 revision
       - name: Save new revision
