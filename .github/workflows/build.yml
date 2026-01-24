@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 0. Tailscale
       - name: Tailscale
         uses: tailscale/github-action@v2
         with:
@@ -41,6 +40,7 @@ jobs:
           sudo apt-get install -y subversion
           svn --version
 
+      # 3. 缓存
       - name: Cache SVN working copy
         id: cache-svn
         uses: actions/cache@v4
@@ -48,7 +48,7 @@ jobs:
           path: src
           key: svn-wc-${{ runner.os }}
 
-      # 3. 获取 SVN 最新 revision
+      # 4. 获取 SVN 最新 revision
       - name: Get SVN latest revision
         id: svn
         env:
@@ -62,7 +62,7 @@ jobs:
           echo "rev=$REV" >> $GITHUB_OUTPUT
           echo "SVN revision: $REV"
 
-      # 4. 读取上一次 revision
+      # 5. 读取上一次 revision
       - name: Load last revision
         id: last
         run: |
@@ -74,7 +74,7 @@ jobs:
           echo "last=$LAST" >> $GITHUB_OUTPUT
           echo "Last recorded revision: $LAST"
 
-      # 5. 对比 revision / force
+      # 6. 对比 revision / force
       - name: Compare revision
         id: diff
         run: |
@@ -90,7 +90,7 @@ jobs:
             echo "No update needed"
           fi
 
-      # 6. 拉取 / 更新 SVN
+      # 7. 拉取 / 更新 SVN
       - name: Checkout or Update SVN
         if: steps.diff.outputs.updated == 'true'
         env:
@@ -106,10 +106,9 @@ jobs:
             svn checkout $SVN_URL src --username $SVN_USERNAME --password $SVN_PASSWORD --non-interactive --trust-server-cert-failures=unknown-ca,cn-mismatch,expired,not-yet-valid --quiet
           fi
 
-      # 7. Godot 下载 (Linux 版)
+      # 8. Godot 下载
       - name: Godot download
         run: |
-          # 确保环境变量中有 Linux 版的下载链接
           wget ${{ secrets.GODOT_DOWNLOAD_URL }} -O godot.zip
           unzip godot.zip
           # 查找解压后的二进制文件并重命名
@@ -117,18 +116,20 @@ jobs:
           mv "$FILENAME" godot
           chmod +x godot
 
-      # 8. Import project
+      # 9. 导入项目
       - name: Import project
         run: |
           ./godot --headless --import --path ./src/RedMemoryProject
 
-      # 9. Run unit tests
+      # 10. 运行测试
       - name: Run unit tests
         run: |
           # 运行测试并将日志输出到文件
           ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file log.txt
 
+      # 11. 发送邮件通知
       - name: Send report email
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.SMTP_URL }}
@@ -145,7 +146,7 @@ jobs:
             CI Run   : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           attachments: log.txt
 
-      # 10. 保存新的 revision
+      # 12. 保存新的 revision
       - name: Save new revision
         if: steps.diff.outputs.updated == 'true'
         run: |
@@ -161,6 +162,7 @@ jobs:
             git push
           fi
 
+      # 13. 清理
       - name: Clean up
         run: |
           rm -rf ./src/RedMemoryProject/.godot
