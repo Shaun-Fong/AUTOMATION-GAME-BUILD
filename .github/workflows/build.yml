@@ -110,7 +110,7 @@ jobs:
       - name: Godot download
         run: |
           # 确保环境变量中有 Linux 版的下载链接
-          wget ${{ secrets.GODOT_LINUX_DOWNLOAD_URL }} -O godot.zip
+          wget ${{ secrets.GODOT_DOWNLOAD_URL }} -O godot.zip
           unzip godot.zip
           # 查找解压后的二进制文件并重命名
           FILENAME=$(ls | grep "Godot_v.*_linux" | head -n 1)
