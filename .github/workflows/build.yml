@@ -143,7 +143,7 @@ jobs:
           } > /home/runner/mail_body.txt
       - name: Send report email
         if: always()
-        uses: hemupadhyay26/action-email-notification@v1
+        uses: hemupadhyay26/action-email-notification@v1.1
         with:
           type: 'password'
           server_address: ${{ secrets.SMTP_URL }}
