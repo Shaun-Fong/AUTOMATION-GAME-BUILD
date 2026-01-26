@@ -143,8 +143,9 @@ jobs:
           } > /home/runner/mail_body.txt
       - name: Send report email
         if: always()
-        uses: dawidd6/action-send-mail@v3
+        uses: hemupadhyay26/action-email-notification@v1
         with:
+          type: 'password'
           server_address: ${{ secrets.SMTP_URL }}
           server_port: ${{ secrets.SMTP_PORT }}
           username: ${{ secrets.SMTP_USER }}
@@ -152,7 +153,7 @@ jobs:
           subject: ${{ github.repository }} CI Report
           to: ${{ secrets.SMTP_TO }}
           from: CI Bot <${{ secrets.SMTP_USER }}>
-          body_file: /home/runner/mail_body.txt
+          body: file:///home/runner/mail_body.txt
           attachments: /home/runner/log.txt
 
       # 12. 保存新的 revision
