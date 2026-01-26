@@ -131,7 +131,24 @@ jobs:
       - name: Build email body
         if: always()
         run: |
-          sed -n '/^Summary Begin$/,/^Summary End$/p' /home/runner/log.txt > /home/runner/summary.txt
+          SUMMARY_FILE=/home/runner/summary.txt
+          LOG_FILE=/home/runner/log.txt
+          MAIL_FILE=/home/runner/mail_body.txt
+      
+          # 1. 提取 Summary（如果 log 存在）
+          if [ -f "$LOG_FILE" ]; then
+            sed -n '/^Summary Begin$/,/^Summary End$/p' "$LOG_FILE" \
+              | sed '1d;$d' > "$SUMMARY_FILE"
+      
+            # 如果 Summary 区块不存在
+            if [ ! -s "$SUMMARY_FILE" ]; then
+              echo "Summary section not found in log." > "$SUMMARY_FILE"
+            fi
+          else
+            echo "log.txt not found." > "$SUMMARY_FILE"
+          fi
+      
+          # 2. 生成邮件正文
           {
             echo "Automated test finished."
             echo ""
@@ -139,8 +156,10 @@ jobs:
             echo "Run ID   : $GITHUB_RUN_ID"
             echo "CI Run   : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo ""
-            cat /home/runner/summary.txt
-          } > /home/runner/mail_body.txt
+            echo "============== SUMMARY =============="
+            cat "$SUMMARY_FILE"
+          } > "$MAIL_FILE"
+          
       - name: Send report email
         if: always()
         uses: hemupadhyay26/action-email-notification@v1.1
