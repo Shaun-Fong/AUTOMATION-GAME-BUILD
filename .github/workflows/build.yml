@@ -128,6 +128,19 @@ jobs:
           ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file ~/log.txt
 
       # 11. 发送邮件通知
+      - name: Build email body
+        if: always()
+        run: |
+          sed -n '/^Summary Begin$/,/^Summary End$/p' /home/runner/log.txt > /home/runner/summary.txt
+          {
+            echo "Automated test finished."
+            echo ""
+            echo "Branch   : $GITHUB_REF_NAME"
+            echo "Run ID   : $GITHUB_RUN_ID"
+            echo "CI Run   : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo ""
+            cat /home/runner/summary.txt
+          } > /home/runner/mail_body.txt
       - name: Send report email
         if: always()
         uses: dawidd6/action-send-mail@v3
@@ -139,11 +152,7 @@ jobs:
           subject: ${{ github.repository }} CI Report
           to: ${{ secrets.SMTP_TO }}
           from: CI Bot <${{ secrets.SMTP_USER }}>
-          body: |
-            Automated test finished.
-            Branch   : ${{ github.ref_name }}
-            Run ID   : ${{ github.run_id }}
-            CI Run   : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          body_file: /home/runner/mail_body.txt
           attachments: /home/runner/log.txt
 
       # 12. 保存新的 revision
