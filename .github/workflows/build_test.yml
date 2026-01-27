@@ -209,7 +209,7 @@ jobs:
       - name: Build
         run: |
           # 导出
-          ./godot --headless --export-debug "Windows Desktop" ./export/RED-MEMORY.exe
+          ./godot --headless --path ./src/RedMemoryProject --export-debug "Windows Desktop" ./export/RED-MEMORY.exe
           
       # 14. 保存新的 revision
       - name: Save new revision
