@@ -175,41 +175,41 @@ jobs:
           attachments: /home/runner/log.txt
           
       # 12. 安装导出模板
-      - name: Install Godot export templates
-        env:
-          GODOT_TEMPLATES_URL: ${{ secrets.GODOT_TEMPLATES_URL }}
-        run: |
-          set -e
-          TEMPLATE_ROOT="$HOME/.local/share/godot/export_templates"
-          TPZ_FILE="templates.tpz"
+      #- name: Install Godot export templates
+      #  env:
+      #    GODOT_TEMPLATES_URL: ${{ secrets.GODOT_TEMPLATES_URL }}
+      #  run: |
+      #    set -e
+      #    TEMPLATE_ROOT="$HOME/.local/share/godot/export_templates"
+      #    TPZ_FILE="templates.tpz"
 
-          wget -O "$TPZ_FILE" "$GODOT_TEMPLATES_URL"
+      #    wget -O "$TPZ_FILE" "$GODOT_TEMPLATES_URL"
 
-          # 从文件名提取版本号
-          BASENAME=$(basename "$GODOT_TEMPLATES_URL")
-          VERSION=$(echo "$BASENAME" | sed -E 's/Godot_v([0-9.]+)-([a-z0-9]+)_export_templates\.tpz/\1.\2/')
+      #    # 从文件名提取版本号
+      #    BASENAME=$(basename "$GODOT_TEMPLATES_URL")
+      #    VERSION=$(echo "$BASENAME" | sed -E 's/Godot_v([0-9.]+)-([a-z0-9]+)_export_templates\.tpz/\1.\2/')
 
-          echo "Detected Godot template version: $VERSION"
+      #    echo "Detected Godot template version: $VERSION"
 
-          mkdir -p "$TEMPLATE_ROOT"
-          TMP_DIR=$(mktemp -d)
+      #    mkdir -p "$TEMPLATE_ROOT"
+      #    TMP_DIR=$(mktemp -d)
 
-          unzip -q "$TPZ_FILE" -d "$TMP_DIR"
+      #    unzip -q "$TPZ_FILE" -d "$TMP_DIR"
 
-          # 重命名 templates 文件夹为版本号
-          mkdir -p "$TEMPLATE_ROOT/$VERSION"
-          mv "$TMP_DIR/templates/"* "$TEMPLATE_ROOT/$VERSION/"
+      #    # 重命名 templates 文件夹为版本号
+      #    mkdir -p "$TEMPLATE_ROOT/$VERSION"
+      #    mv "$TMP_DIR/templates/"* "$TEMPLATE_ROOT/$VERSION/"
 
-          rm -rf "$TMP_DIR"
+      #    rm -rf "$TMP_DIR"
 
-          echo "Godot export templates installed:"
-          ls "$TEMPLATE_ROOT/$VERSION"
+      #    echo "Godot export templates installed:"
+      #    ls "$TEMPLATE_ROOT/$VERSION"
 
       # 13. 导出
-      - name: Build
-        run: |
-          # 导出
-          ./godot --headless --path ./src/RedMemoryProject --export-debug "Windows Desktop" ./export/RED-MEMORY.exe
+      #- name: Build
+      #  run: |
+      #    # 导出
+      #    ./godot --headless --path ./src/RedMemoryProject --export-debug "Windows Desktop" ./export/RED-MEMORY.exe
           
       # 14. 保存新的 revision
       - name: Save new revision
