@@ -108,6 +108,7 @@ jobs:
 
       # 8. Godot 下载
       - name: Godot download
+        if: steps.diff.outputs.updated == 'true'
         run: |
           wget ${{ secrets.GODOT_DOWNLOAD_URL }} -O godot.zip
           unzip godot.zip
@@ -118,18 +119,21 @@ jobs:
 
       # 9. 导入项目
       - name: Import project
+        if: steps.diff.outputs.updated == 'true'
         run: |
           ./godot --headless --quiet --import --path ./src/RedMemoryProject
 
       # 10. 运行测试
       - name: Run unit tests
+        id: run_test
+        if: steps.diff.outputs.updated == 'true'
         run: |
           # 运行测试并将日志输出到文件
           ./godot --headless --path ./src/RedMemoryProject -s res://addons/gut/gut_cmdln.gd -gdir=res://test -gexit -ginclude_subdirs --log-file ~/log.txt
 
       # 11. 发送邮件通知
       - name: Build email body
-        if: always()
+        if: always() && steps.run_test.outcome != 'skipped'
         run: |
           SUMMARY_FILE=/home/runner/summary.txt
           LOG_FILE=/home/runner/log.txt
@@ -160,7 +164,7 @@ jobs:
           } > "$MAIL_FILE"
           
       - name: Send report email
-        if: always()
+        if: always() && steps.run_test.outcome != 'skipped'
         uses: hemupadhyay26/action-email-notification@v1.1
         with:
           type: 'password'
@@ -229,6 +233,6 @@ jobs:
 
       # 13. 清理
       - name: Clean up
-        if: always()
+        if: steps.diff.outputs.updated == 'true'
         run: |
           rm -rf ./src/RedMemoryProject/.godot
